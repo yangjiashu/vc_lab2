@@ -4,7 +4,8 @@ import sklearn
 import sklearn.datasets 
 import sklearn.linear_model 
 import matplotlib 
- 
+import valueflow as vf
+
 # Display plots inline and change default figure size 
 matplotlib.rcParams['figure.figsize'] = (10.0, 8.0) 
  
@@ -53,37 +54,56 @@ model = {'W1': weight_b(2,hidden_layers,'w'), 'b1':weight_b(1,hidden_layers,'b')
 
 def predict(model, x):
     W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
-    z1 = x.dot(W1) + b1
-    a1 = np.tanh(z1)
-    z2 = a1.dot(W2) + b2
-    exp_scores = np.exp(z2)
-    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+#    z1 = x.dot(W1) + b1
+#    a1 = np.tanh(z1)
+#    z2 = a1.dot(W2) + b2
+#    exp_scores = np.exp(z2)
+#    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    hidden = vf.tanh_forward(x, W1, b1)
+    probs = vf.softmax_forward(hidden, W2, b2)
     return np.argmax(probs, axis=1)
 
 def train(input_data, labels, W1, b1, W2, b2, num_passes, reg_lambda, epsilon):
     for i in range(num_passes):
-        z1 = input_data.dot(W1) + b1 #(200, 4)
-        a1 = np.tanh(z1) #(200,4)
-        z2 = a1.dot(W2) + b2 #(200,1)
-        exp_scores = np.exp(z2) #(200,1)
-        probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True) #(200,1)
+#        z1 = input_data.dot(W1) + b1 #(200, 4)
+#        a1 = np.tanh(z1) #(200,4)
+#        z2 = a1.dot(W2) + b2 #(200,1)
+#        exp_scores = np.exp(z2) #(200,1)
+#        probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True) #(200,1)
+#        
+#        delta3 = probs - labels
+#        # print("delta3 shape:", delta3.shape) # (200,2)
+##        delta3[range(num_examples),y] -= 1
+#        dW2 = (a1.T).dot(delta3)
+#        db2 = np.sum(delta3, axis=0, keepdims=True)
+#        delta2 = delta3.dot(W2.T) * (1-np.power(a1,2))
+#        # print("delta2 shape:", delta2.shape) # (200,10)
+#        dW1 = np.dot(X.T, delta2)
+#        # print("dw1 shape: ", dW1.shape) # (2, 10)
+#        db1 = np.sum(delta2, axis=0)
+#        
+#        dW2 += reg_lambda * W2
+#        # print("dw2 shape: ", dW2.shape) # (10, 2)
+#        dW1 += reg_lambda * W1
+    
+        # forward
+        hidden = vf.tanh_forward(input_data, W1, b1)
+        probs = vf.softmax_forward(hidden, W2, b2)
         
-        delta3 = probs - labels
-#        delta3[range(num_examples),y] -= 1
-        dW2 = (a1.T).dot(delta3)
-        db2 = np.sum(delta3, axis=0, keepdims=True)
-        delta2 = delta3.dot(W2.T) * (1-np.power(a1,2))
-        dW1 = np.dot(X.T, delta2)
-        db1 = np.sum(delta2, axis=0)
+        # loss
+        loss, dz = vf.cross_entropy(labels, probs, True)
         
-        dW2 += reg_lambda * W2
-        dW1 += reg_lambda * W1
-        
-        W1 += -epsilon * dW1
+        # backward
+        dW2, db2, dflow = vf.softmax_backward(dz, hidden, W2, b2)
+        dW1, db1, _ = vf.tanh_backward(dflow, input_data, W1, b1)
+    
+        W1 += -epsilon * dW1    
         b1 += -epsilon * db1
         W2 += -epsilon * dW2
         b2 += -epsilon * db2
-
+        
+        
+        
 catagories = list(np.unique(y))
 labels = np.zeros((y.shape[0], len(catagories)), dtype=np.float64)
 for i in range(labels.shape[0]):
